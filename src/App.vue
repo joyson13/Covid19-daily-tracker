@@ -1,7 +1,7 @@
 <template>
   <div class="container-fluid p-5 bg-light text-center my-3">
     <h1>Covid-19 Daily Tracker for India</h1>
-    <h5 class="text-muted">Double click on a state's name to view it's data of last month</h5>
+    <h5 class="text-muted">Double click on a state code to view it's data of last 30 days</h5>
   </div>
 
   <div class="container my-5">
