@@ -1,7 +1,7 @@
 <template>
   <div class="container-fluid p-5 bg-light text-center my-3">
     <h1>Covid-19 Daily Tracker for India</h1>
-    <h5 class="text-muted">Double click on a state code to view it's data of last 30 days</h5>
+    <h5 class="text-muted">Double click on a state code and enter dates to view the graph</h5>
   </div>
 
   <div class="container my-5">
@@ -37,8 +37,10 @@
         </p>
       </div>
       <div class="col-6">
-        <canvas id="myChart"></canvas>
-        <p class="text-center"> Dates of last 30 days </p>
+        <canvas id="myChart"></canvas> 
+        <p>Please select start and end date</p>
+        <input type="date" id="datefrom" placeholder="Select start date" min= "2020-05-14" v-model="datefrom" @change="dateSelect()">
+        <input type="date" id="dateto" placeholder="Select end date" v-model="dateto" @change="dateSelect()">
       </div>
     </div>
   </div>
@@ -49,45 +51,68 @@ var myChart;
 export default {
   data() {
     return {
-      rawdata: [],
       codes: [],
       confirmed: [],
       recovered: [],
-      confirmed30: [],
-      recovered30: [],
+      confirmedset: [],
+      recoveredset: [],
       confirmedline: [],
       recoveredline: [],
-      myChart: {}
+      myChart: {},
+      datefrom: '',
+      dateto: '',
+      statecode: ''
     }
   },
   methods: {
+    filterDate(obj) {
+      let currdateObj = new Date(obj.dateymd);
+      let mindateObj = new Date(this.datefrom);
+      let maxdateObj = new Date(this.dateto);
+      return (currdateObj >= mindateObj && currdateObj <= maxdateObj);
+    },
+    calculateDataSets() {
+      if(this.datefrom != '' && this.dateto != '' && this.statecode != '') {
+
+        var confirmedFiltered = this.confirmedset.filter(this.filterDate);
+        var recoveredFiltered = this.recoveredset.filter(this.filterDate);
+
+        var newConfirmedLine = [];
+        var newRecoveredLine = [];
+        var newLabels = [];
+
+        for(var ele in confirmedFiltered) {
+          newConfirmedLine.push(confirmedFiltered[ele][this.statecode]);
+          newLabels.push(confirmedFiltered[ele]["dateymd"]); 
+        }
+
+        for(var ele in recoveredFiltered)
+          newRecoveredLine.push(recoveredFiltered[ele][this.statecode]);
+
+        this.confirmedline = newConfirmedLine;
+        this.recoveredline = newRecoveredLine;
+
+        // console.log(this.confirmedline);
+        // console.log(this.recoveredline);
+
+        myChart.data.datasets[0].data = this.confirmedline;
+        myChart.data.datasets[1].data = this.recoveredline;
+        myChart.data.labels = newLabels;
+        myChart.update();
+      }
+    },
     handleClick(item) {
-      // console.log(item);
-
-      var newConfirmedLine = [];
-      var newRecoveredLine = [];
-
-      for(var ele in this.confirmed30)
-        newConfirmedLine.push(this.confirmed30[ele][item]); 
-
-      for(var ele in this.recovered30)
-        newRecoveredLine.push(this.recovered30[ele][item]);
-
-      this.confirmedline = newConfirmedLine;
-      this.recoveredline = newRecoveredLine;
-
-      // console.log(this.confirmedline);
-      // console.log(this.recoveredline);
-
-      myChart.data.datasets[0].data = this.confirmedline;
-      myChart.data.datasets[1].data = this.recoveredline;
-      myChart.update();
+      this.statecode = item;
+      this.calculateDataSets();
+    },
+    dateSelect() {
+      this.calculateDataSets();
     }
   },
   mounted() {
     fetch('https://api.covid19india.org/states_daily.json')
     .then(res => res.json())
-    .then(data => this.rawdata = data["states_daily"].slice(870))
+    .then(data => this.rawdata = data["states_daily"])
     .then(rawdata => {
       // console.log(rawdata);
       this.confirmed = rawdata[rawdata.length -3];
@@ -103,35 +128,42 @@ export default {
       for(var key in this.confirmed)
         this.codes.push(key);
 
-      rawdata.reverse();
-      var i;
-      for(i=0; i<91; i++) {
-        if(i%3==1) this.recovered30.push(rawdata[i]);
-        else if(i%3==2) this.confirmed30.push(rawdata[i]);
-        }
+      function checkConfirmed(obj) {
+        return obj.status == 'Confirmed'
+      }
 
-      this.confirmed30.reverse();
-      this.recovered30.reverse();
+      function checkRecovered(obj) {
+        return obj.status == 'Recovered'
+      }
 
-      // console.log(this.confirmed30);
-      // console.log(this.recovered30);
-      // console.log(this.codes);
-      // console.log(this.confirmed);
-      // console.log(this.recovered);
-    
-    for(var item in this.confirmed30)
-      this.confirmedline.push(this.confirmed30[item].mh); 
+      this.confirmedset = rawdata.filter(checkConfirmed);
+      this.recoveredset = rawdata.filter(checkRecovered);
 
-    for(var item in this.recovered30)
-      this.recoveredline.push(this.recovered30[item].mh);
-   
+    // Setting maximum selectable date on the datepicker as per API data availability
+    var currentDate = new Date();
+    currentDate.setDate(currentDate.getDate() - 1);
+    var cDay = currentDate.getDate()
+    if(cDay<10) cDay = '0'+cDay;
+    var cMonth = currentDate.getMonth() + 1
+    if(cMonth<10) cMonth = '0'+cMonth;
+    var cYear = currentDate.getFullYear()
+    var yesterday = cYear+'-'+cMonth+'-'+cDay;
+    //console.log(yesterday);
+
+    // Setting minimum selectable date on the datepicker as per API data availability
+    var mindate = "2020-05-14";
+
+    document.getElementById("datefrom").min = mindate;
+    document.getElementById("dateto").min = mindate;
+    document.getElementById("datefrom").max = yesterday;
+    document.getElementById("dateto").max = yesterday;
 
     // Chart initialization 
     var ctx = document.getElementById("myChart").getContext('2d');
     myChart = new Chart(ctx, {
     type: 'line',
     data: {
-        labels: ['30', '31', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28'],
+        labels: [],
         datasets: [
           {
             label: 'Confirmed Cases',
